@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chat Room</title>
+    <style>
+        /* Reference: https://socket.io/get-started/chat#integrating-socketio */ 
+        body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        #send_form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 5%; width: 55%; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
+        /* #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; display: flex; align-items: center; justify-content: center; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }  */
+        #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
+        #input:focus { outline: none; }
+        #seng_form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+  
+        #messages { list-style-type: none; margin: 0; padding: 0; width: 90%; }
+        #messages > li { padding: 0.5rem 1rem; }
+        #messages > li:nth-child(odd) { background: #efefef; }
+        #main {
+            position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+            width: 95%;
+            height:95%;
+            margin: 10px auto;
+
+            border-style:inset;
+            border-width:medium;
+            border-color:cadetblue;
+
+            display: flex;
+
+            /* text-align: center; */
+        }
+        #main .left_bar {
+            width: 40%;
+            margin-top: 10px;
+        }
+        #main .chat_window {
+            width: 60%;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            display: flex;
+        }
+      </style>
+    <script src="/socket.io/socket.io.js"></script>
+    
+</head>
+
+<body>
+    <!-- <input type=text" id="message_input" />
+    <button onclick="sendMessage()">send</button>
+    <div id="chatlog"></div> -->
+    <div id="main">
+        <div class="left_bar" id="left_bar">
+            <div id="login">
+                <input type="text" id="username" placeholder="Username" />
+                <button id="login_btn">Sign in</button> <br><br>
+            </div>
+            <div id="user_info" hidden>
+                <span id="greeting"></span>
+                <button id="signout_btn">Sign out</button>
+            </div>
+            <div id="user_list" hidden>
+                <ol id="">
+                </ol>
+            </div>
+
+            <div id="room_list" hidden>
+                <ol id="">
+                </ol>
+            </div>
+        </div>
+        <div class= "chat_window" id="chat_window">
+            <ul id="messages"></ul>
+            <form id="send_form">
+                <input id="input" autocomplete="off" /><button id="send_btn">Send</button>
+            </form>
+        </div>
+    </div>
+
+</body>
+
+<script type="text/javascript">
+    // Ref: https://socket.io/get-started/chat#serving-html
+    let socket = io();
+    let send_form = document.getElementById('send_form');
+    let login = document.getElementById('login');
+    let send_btn = document.getElementById('send_btn');
+    let input = document.getElementById('input');
+    let messages = document.getElementById('messages');
+    let user_list = document.getElementById('user_list');
+    let user_info = document.getElementById('user_info');
+    let greeting = document.getElementById('greeting');
+    let logout_btn = document.getElementById('logout_btn');
+    // Send message
+    send_btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (input.value) {
+            // Sends a request to all users in the specific room
+            socket.emit('message_request', {"message": input.value, "room": null});
+            input.value = '';
+        }
+    });
+    // Login
+    login_btn.addEventListener('click', function() {
+        if (username.value) 
+            socket.emit("login_request", username.value);
+    });
+
+    socket.on("message_response", function (data) {
+        //Append an HR thematic break and the escaped HTML of the new message
+        let item = document.createElement('li');
+        item.textContent = data["message"];
+        messages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+    });
+    socket.on("login_response", function (data) {
+        let username = data["username"];
+        login.hidden = true;
+        user_info.hidden = false;
+        greeting.textContent = `Welcome, ${username}`;
+        // user_list.createElement("li").createElement("span").textContent = data['username'];
+    })
+</script>
+
+</html>
