@@ -1,0 +1,66 @@
+body { 
+    margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    #send_form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 5%; width: 45%; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
+    /* #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; display: flex; align-items: center; justify-content: center; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }  */
+    #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
+    #input:focus { outline: none; }
+    #seng_form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+
+    #messages { list-style-type: none; margin: 0; padding: 0; width: 90%; }
+    #messages > li { padding: 0.5rem 1rem; }
+    #messages > li:nth-child(odd) { background: #efefef; 
+}
+
+#main {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    width: 95%;
+    height:95%;
+    margin: 10px auto;
+
+    border-style:inset;
+    border-width:medium;
+    border-color:cadetblue;
+
+    display: flex;
+
+    /* text-align: center; */
+}
+#main .left_bar  {
+    width: 25%;
+    margin-top: 10px;
+    margin-left: 10px;
+}
+#main .right_bar  {
+    width: 25%;
+    margin-top: 10px;
+    margin-right: 10px;
+}
+#main .chat_window {
+    width: 50%;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    display: flex;
+}
+.creator {
+    font-size: small;
+    color:darkolivegreen;
+    padding-left: 5px;
+}
+.room_name {
+    font-size:larger;
+}
+.room_div {
+    width: 100%;
+    cursor: pointer;
+}
+.current_room {
+    background-color: #efefef;
+}
+.msg_name {
+    font-size: small;
+    color:darkolivegreen;
+}
+.msg_li {
+    word-wrap:break-word;
+    white-space: normal;
+}

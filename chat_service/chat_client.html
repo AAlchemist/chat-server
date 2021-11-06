@@ -5,43 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Chat Room</title>
-    <style>
-        /* Reference: https://socket.io/get-started/chat#integrating-socketio */ 
-        body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        #send_form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 5%; width: 55%; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
-        /* #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; display: flex; align-items: center; justify-content: center; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }  */
-        #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
-        #input:focus { outline: none; }
-        #seng_form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
-  
-        #messages { list-style-type: none; margin: 0; padding: 0; width: 90%; }
-        #messages > li { padding: 0.5rem 1rem; }
-        #messages > li:nth-child(odd) { background: #efefef; }
-        #main {
-            position: absolute; left: 0; top: 0; right: 0; bottom: 0;
-            width: 95%;
-            height:95%;
-            margin: 10px auto;
-
-            border-style:inset;
-            border-width:medium;
-            border-color:cadetblue;
-
-            display: flex;
-
-            /* text-align: center; */
-        }
-        #main .left_bar {
-            width: 40%;
-            margin-top: 10px;
-        }
-        #main .chat_window {
-            width: 60%;
-            padding-top: 10px;
-            padding-bottom: 10px;
-            display: flex;
-        }
-      </style>
+    <link rel="stylesheet" type="text/css" href="/chat_client.css">
     <script src="/socket.io/socket.io.js"></script>
     
 </head>
@@ -56,25 +20,28 @@
                 <input type="text" id="username" placeholder="Username" />
                 <button id="login_btn">Sign in</button> <br><br>
             </div>
-            <div id="user_info" hidden>
+            <div id="user_info" class="user_info" hidden>
                 <span id="greeting"></span>
-                <button id="signout_btn">Sign out</button>
-            </div>
-            <div id="user_list" hidden>
-                <ol id="">
-                </ol>
+                <button id="logout_btn">Sign out</button>
             </div>
 
-            <div id="room_list" hidden>
-                <ol id="">
-                </ol>
+            <div id="room_info" class="room_info" hidden  style="padding-top: 10px;">
+                <span style="font-size: x-large; padding-right: 10px;"><strong>ROOMS</strong></span><br>
+                <button type="button" id="global_btn">Return to Global Chat</button><br><br>
+                <input type="text" id="new_room_name" placeholder="New Room Name" />
+                <button type="button" id="create_room_btn">Create</button> <br>
+                <div id="room_list" style="width: 100%;"><span id="no_room">No Room</span></div>
             </div>
         </div>
         <div class= "chat_window" id="chat_window">
             <ul id="messages"></ul>
             <form id="send_form">
-                <input id="input" autocomplete="off" /><button id="send_btn">Send</button>
+                <input id="input" autocomplete="off" /><button id="send_btn" disabled>Send</button>
             </form>
+        </div>
+        <div class="right_bar" id="right_bar" hidden>
+            <span id="users_span" style="font-size: large;"></span>
+            <div id="user_list" style="width: 100%;"></div>
         </div>
     </div>
 
@@ -92,35 +59,160 @@
     let user_info = document.getElementById('user_info');
     let greeting = document.getElementById('greeting');
     let logout_btn = document.getElementById('logout_btn');
+    let room_list = document.getElementById("room_list");
+    let room_info = document.getElementById("room_info");
+    let new_room_name = document.getElementById("new_room_name");
+    let create_room_btn = document.getElementById("create_room_btn");
+    let no_room = document.getElementById("no_room");
+    let global_btn = document.getElementById("global_btn");
+    let right_bar = document.getElementById("right_bar");
+    
+    let login_status = false;
+    let current_room = "global";
+
+    // Create a new chat room
+    create_room_btn.addEventListener('click', function() {
+        if (new_room_name.value && new_room_name.value.trim() != "")
+            socket.emit("create_room_request", new_room_name.value);
+        new_room_name.value = "";
+    })
+    socket.on("create_room_response", function(room_creator) {
+        if (login_status) refresh_rooms(new Map(room_creator));
+    });
+
     // Send message
     send_btn.addEventListener('click', function(e) {
         e.preventDefault();
         if (input.value) {
             // Sends a request to all users in the specific room
-            socket.emit('message_request', {"message": input.value, "room": null});
+            socket.emit('message_request', {"message": input.value, "room": current_room});
             input.value = '';
         }
     });
+    socket.on("message_response", function (data) {
+        //Append an HR thematic break and the escaped HTML of the new message
+        let item = document.createElement('li');
+        item.classList.add("msg_li");
+        item.innerHTML = `<span class="msg_name">${data["username"]}</span> <br> ${data["message"]}`;
+        messages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+    });
+
     // Login
     login_btn.addEventListener('click', function() {
         if (username.value) 
             socket.emit("login_request", username.value);
+        username.value = "";
     });
-
-    socket.on("message_response", function (data) {
-        //Append an HR thematic break and the escaped HTML of the new message
-        let item = document.createElement('li');
-        item.textContent = data["message"];
-        messages.appendChild(item);
-        window.scrollTo(0, document.body.scrollHeight);
-    });
-    socket.on("login_response", function (data) {
+    socket.on("login_response", function(data) {
+        login_status = true;
+        send_btn.disabled = false;
         let username = data["username"];
         login.hidden = true;
         user_info.hidden = false;
-        greeting.textContent = `Welcome, ${username}`;
+        right_bar.hidden = false;
+        
+        greeting.innerHTML = `Welcome, <strong>${username}</strong>`;
         // user_list.createElement("li").createElement("span").textContent = data['username'];
+        refresh_rooms(new Map(data["room_creator"]));
+    });
+
+    // Logout
+    logout_btn.addEventListener('click', function() {
+        socket.emit("logout_request");
     })
+    socket.on("logout_response", function() {
+        login_status = false;
+        login.hidden = false;
+        send_btn.disabled = true;
+        user_info.hidden = true;
+        room_info.hidden = true;
+        right_bar.hidden = true;
+        messages.innerHTML = "";
+        input.value = "";
+    })
+    
+
+    // Alert error message from the server
+    socket.on("error_msg", function(msg) {
+        alert(msg);
+    });
+
+    function refresh_rooms(room_creator) {
+        // console.log(room_creator);
+        room_info.hidden = false;
+        room_list.innerHTML = "";
+        if (room_creator.size != 0) {
+            no_room.remove();
+            let rooms = room_creator.keys();
+            for (let room of rooms) {
+                let room_div = document.createElement("div");
+                room_div.classList.add("room_div");
+                // Join a chat room 
+                room_div.id = room + "_room_div";
+                let name_span = document.createElement("span");
+                name_span.innerText = room;
+                name_span.classList.add("room_name");
+                room_div.appendChild(name_span);
+                let creator_span = document.createElement("span");
+                // Get username by socket id
+                creator_span.innerText = "Host: " + room_creator.get(room);
+                creator_span.classList.add("creator");
+                room_div.appendChild(creator_span);
+                room_list.appendChild(room_div);
+                room_div.addEventListener("click", function(event) {
+                    messages.innerHTML = "";
+                    input.value = "";
+                    // Change room
+                    if (current_room != room) {
+                        // Active CSS
+                        if (current_room != null) {
+                            let last_room = document.getElementById(current_room + "_room_div");
+                            if (last_room != null) last_room.classList.remove("current_room");
+                        }
+                        current_room = room;
+                        room_div.classList.add("current_room");
+                        // emit request
+                        socket.emit("change_room_request", room);
+                    }
+                }, false);
+            }
+        }
+    }
+    socket.on("change_room_response", function(data) {
+        // Update user list
+        document.getElementById("users_span").innerHTML = `<strong>Users in ${data["room"]}</strong>`;
+        let username_list = data["users"];
+        let host = data["host"];
+        user_list.innerHTML = "";
+        for (let username of username_list) {
+            let user_div = document.createElement("div");
+            let username_span = document.createElement("span");
+            username_span.innerText = username;
+            user_div.appendChild(username_span);
+            if (username == host) {
+                let host_span = document.createElement("span");
+                host_span.textContent = "(Host)";
+                host_span.classList.add("creator");
+                user_div.appendChild(host_span);
+            }
+            // TODO: Ban, Kick buttons
+
+            user_list.appendChild(user_div);
+        }
+            
+    });
+
+    global_btn.addEventListener("click", function() {
+        if (current_room != "global") {
+            if (current_room != null) {
+                let last_room = document.getElementById(current_room + "_room_div");
+                if (last_room != null) last_room.classList.remove("current_room");
+            }
+            current_room = "global";
+            socket.emit("change_room_request", "global");
+        }
+    }, false)
 </script>
 
 </html>
