@@ -30,13 +30,21 @@
                 <button type="button" id="global_btn">Return to Global Chat</button><br><br>
                 <input type="text" id="new_room_name" placeholder="New Room Name" />
                 <button type="button" id="create_room_btn">Create</button> <br>
+                <input type="password" id="room_pwd" placeholder="Set password if you want" /><br>                
                 <div id="room_list" style="width: 100%;"><span id="no_room">No Room</span></div>
             </div>
+            <span id = "pwd_req"></span><br>
+            <input type = "password" id = "enter_pwd" hidden></input><br>
+            <button type="button" id="submit_pwd"hidden>Submit</button>
+
         </div>
         <div class= "chat_window" id="chat_window">
             <ul id="messages"></ul>
             <form id="send_form">
                 <input id="input" autocomplete="off" /><button id="send_btn" disabled>Send</button>
+                <select id = 'dm_list'>
+                    <option value = 'public'>Public</option>
+                </select>
             </form>
         </div>
         <div class="right_bar" id="right_bar" hidden>
@@ -60,21 +68,31 @@
     let greeting = document.getElementById('greeting');
     let logout_btn = document.getElementById('logout_btn');
     let room_list = document.getElementById("room_list");
+    let dm_list = document.getElementById("dm_list");
     let room_info = document.getElementById("room_info");
     let new_room_name = document.getElementById("new_room_name");
+    let room_pwd = document.getElementById("room_pwd");
     let create_room_btn = document.getElementById("create_room_btn");
     let no_room = document.getElementById("no_room");
     let global_btn = document.getElementById("global_btn");
     let right_bar = document.getElementById("right_bar");
-    
+    let clicked_room = null; // for dm function use
+    let curr_username = null;
+    let protected_rooms = null;
+    let pwd_req = document.getElementById("pwd_req");
+    let pwd_field = document.getElementById("enter_pwd");
+    let submit_pwd = document.getElementById("submit_pwd");
     let login_status = false;
     let current_room = "global";
 
     // Create a new chat room
     create_room_btn.addEventListener('click', function() {
         if (new_room_name.value && new_room_name.value.trim() != "")
-            socket.emit("create_room_request", new_room_name.value);
+            socket.emit("create_room_request", {"new_room_name":new_room_name.value,
+            "room_pwd": room_pwd.value
+        });
         new_room_name.value = "";
+        room_pwd.value = "";
     })
     socket.on("create_room_response", function(room_creator) {
         if (login_status) refresh_rooms(new Map(room_creator));
@@ -83,21 +101,44 @@
     // Send message
     send_btn.addEventListener('click', function(e) {
         e.preventDefault();
+
         if (input.value) {
             // Sends a request to all users in the specific room
-            socket.emit('message_request', {"message": input.value, "room": current_room});
-            input.value = '';
+            if(dm_list.value == "public"){
+                socket.emit('message_request', {"message": input.value, "room": current_room});
+                input.value = '';
+            }else{
+                socket.emit('dm', {'to': dm_list.value, 'room_name': current_room, 'msg': input.value});
+                input.value = '';
+            }
+            
         }
     });
     socket.on("message_response", function (data) {
         //Append an HR thematic break and the escaped HTML of the new message
         let item = document.createElement('li');
         item.classList.add("msg_li");
+        //password reqeust from server
+        if(data["message"] == "This room requires password to enter. Please enter the password here."){
+            pwd_field.hidden=false;
+            submit_pwd.hidden = false;
+            pwd_req.textContent = "Enter the password for "+clicked_room;
+        }
         item.innerHTML = `<span class="msg_name">${data["username"]}</span> <br> ${data["message"]}`;
         messages.appendChild(item);
         window.scrollTo(0, document.body.scrollHeight);
     });
 
+    submit_pwd.addEventListener("click", (e)=>{
+        socket.emit("pwd_verify_request", {"room": clicked_room, 
+        "pwd": pwd_field.value
+        });
+        pwd_field.value = "";
+        pwd_field.hidden = true;
+        submit_pwd.hidden = true;
+        pwd_req.textContent = "";
+
+    }, false);
     // Login
     login_btn.addEventListener('click', function() {
         if (username.value) 
@@ -108,10 +149,10 @@
         login_status = true;
         send_btn.disabled = false;
         let username = data["username"];
+        curr_username = data["username"];
         login.hidden = true;
         user_info.hidden = false;
         right_bar.hidden = false;
-        
         greeting.innerHTML = `Welcome, <strong>${username}</strong>`;
         // user_list.createElement("li").createElement("span").textContent = data['username'];
         refresh_rooms(new Map(data["room_creator"]));
@@ -137,7 +178,7 @@
     socket.on("error_msg", function(msg) {
         alert(msg);
     });
-
+    
     function refresh_rooms(room_creator) {
         // console.log(room_creator);
         room_info.hidden = false;
@@ -166,11 +207,19 @@
                     // Change room
                     if (current_room != room) {
                         // Active CSS
+                        // if(protected_rooms.has(room)){
+                        //     let input_pwd = document.getElementById(room+"_pwd");
+                        //     if(protected_rooms.get(room) != input_pwd.value){
+                        //         socket.emit('wrong_pwd', {"message": "Wrong Password for "+room});
+                        //         return;
+                        //     }
+                        // }
                         if (current_room != null) {
                             let last_room = document.getElementById(current_room + "_room_div");
                             if (last_room != null) last_room.classList.remove("current_room");
                         }
-                        current_room = room;
+                        //current_room = room;
+                        clicked_room = room;
                         room_div.classList.add("current_room");
                         // emit request
                         socket.emit("change_room_request", room);
@@ -183,11 +232,22 @@
         // Update user list
         document.getElementById("users_span").innerHTML = `<strong>Users in ${data["room"]}</strong>`;
         let username_list = data["users"];
+        current_room = data['room'];
         let host = data["host"];
         user_list.innerHTML = "";
+        dm_list.innerHTML = "";
+        let public_option = document.createElement("option");
+        public_option.value = "public";
+        public_option.text = "Public";
+        dm_list.appendChild(public_option);
         for (let username of username_list) {
             let user_div = document.createElement("div");
+            user_div.id = username;
             let username_span = document.createElement("span");
+            if(username!=curr_username){let option_tag = document.createElement("option");
+            option_tag.value = username;
+            option_tag.text = username;
+            dm_list.appendChild(option_tag);}
             username_span.innerText = username;
             user_div.appendChild(username_span);
             if (username == host) {
@@ -197,7 +257,34 @@
                 user_div.appendChild(host_span);
             }
             // TODO: Ban, Kick buttons
+            
+            let ban_btn = document.createElement("button");
+            ban_btn.textContent = "Ban";
+            ban_btn.addEventListener("click", (event)=>{
+                socket.emit("ban_user", {
+                'banner_name': curr_username, 
+                'banned_name':username,
+                'room_name': current_room
+            });
+            user_list.removeChild(document.getElementById(username));
+            }, false);
 
+            //kick
+            let kick_btn = document.createElement("button");
+            kick_btn.textContent = "Kick";
+            kick_btn.addEventListener("click", (event)=>{
+                socket.emit("kick_user", {
+                'banner_name': curr_username, 
+                'banned_name':username,
+                'room_name': current_room
+            });
+            user_list.removeChild(document.getElementById(username));
+            }, false);
+
+            if(curr_username == host && curr_username != username){
+                user_div.appendChild(ban_btn);
+                user_div.appendChild(kick_btn);
+            }
             user_list.appendChild(user_div);
         }
             
