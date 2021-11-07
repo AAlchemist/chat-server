@@ -45,6 +45,11 @@ io.on("connection", function (socket) {
         socket.join(global_room);
         // Send login response to this socket
         socket.emit("login_response", {username: username, room_creator: Array.from(room_creator)});
+        io.to(socket.current_room).emit("change_room_response", {
+            "room": socket.current_room, 
+            "users": get_username_by_sockets(get_sockets_by_room(socket.current_room)), 
+            "host": room_creator.get(socket.current_room)
+        });
     });
     
     socket.on("logout_request", function() {
@@ -90,14 +95,27 @@ io.on("connection", function (socket) {
             is_protected = true;  
         }
         if(!is_banned && !is_protected){
-            if (socket.current_room != null)socket.leave(socket.current_room);
+            if (socket.current_room != null) {
+                socket.leave(socket.current_room);
+                // Update current room
+                io.to(socket.current_room).emit("change_room_response", {
+                    "room": socket.current_room, 
+                    "users": get_username_by_sockets(get_sockets_by_room(socket.current_room)), 
+                    "host": room_creator.get(socket.current_room)
+                });
+            }
+            
+            
+
             socket.join(room);
             socket.current_room = room;
+            // Update new room
             io.to(room).emit("change_room_response", {
                         "room": room, 
                         "users": get_username_by_sockets(get_sockets_by_room(room)), 
                         "host": room_creator.get(room)
             });
+
         }
         else if(is_banned){
             let bannedMsg = "You were banned from this room!";
@@ -215,6 +233,7 @@ io.on("connection", function (socket) {
     function get_sockets_by_room(room) {
         sid_set = io.of("/").adapter.rooms.get(room); // Map<Room, Set<SocketId>>
         let sockets = [];
+        if (sid_set == null) return sockets;
         for (let sid of sid_set)
             sockets.push(io.sockets.sockets.get(sid));
         return sockets;
