@@ -41,7 +41,7 @@
         <div class= "chat_window" id="chat_window">
             <ul id="messages"></ul>
             <form id="send_form">
-                <input id="input" autocomplete="off" /><button id="send_btn" disabled>Send</button>
+                <input id="input" autocomplete="off" onfocusin="Focus_In (event)" onfocusout="Focus_Out (event)"/><button id="send_btn" disabled>Send</button>
                 <select id = 'dm_list'>
                     <option value = 'public'>Public</option>
                 </select>
@@ -114,6 +114,14 @@
             
         }
     });
+    //user typing
+    function Focus_In (event) { 
+        socket.emit("start_typing", {'to': dm_list.value}); 
+    }  
+    function Focus_Out (event) {  
+        socket.emit("stop_typing", {'to': dm_list.value}); 
+    } 
+
     socket.on("message_response", function (data) {
         //Append an HR thematic break and the escaped HTML of the new message
         let item = document.createElement('li');
@@ -178,7 +186,7 @@
     socket.on("error_msg", function(msg) {
         alert(msg);
     });
-    
+
     function refresh_rooms(room_creator) {
         // console.log(room_creator);
         room_info.hidden = false;

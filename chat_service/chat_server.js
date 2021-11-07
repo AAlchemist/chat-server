@@ -204,7 +204,34 @@ io.on("connection", function (socket) {
             socket.broadcast.to(kicked_user_id).emit("message_response", { message: dmMsg , username: socket.username});
         }
     });
-
+    socket.on("start_typing", function(data){
+        var msg = socket.username +" is typing.";
+        if(data["to"] == "Public"){
+            io.to(socket.current_room).emit("message_response", { message: msg , username: "Server"});
+        }else{
+            var sockets = io.sockets.adapter.rooms.get(socket.current_room);
+            for(const s of sockets){
+                const clientSocket = io.sockets.sockets.get(s);
+                if(clientSocket.username == data["to"]){
+                    socket.broadcast.to(clientSocket.id).emit("message_response", { message: msg , username: "Server"});
+                }
+            }
+        }
+    });
+    socket.on("stop_typing", function(data){
+        var msg = socket.username +" stops typing.";
+        if(data["to"] == "Public"){
+            io.to(socket.current_room).emit("message_response", { message: msg , username: "Server"});
+        }else{
+            var sockets = io.sockets.adapter.rooms.get(socket.current_room);
+            for(const s of sockets){
+                const clientSocket = io.sockets.sockets.get(s);
+                if(clientSocket.username == data["to"]){
+                    socket.broadcast.to(clientSocket.id).emit("message_response", { message: msg , username: "Server"});
+                }
+            }
+        }
+    });
     // function get_rooms() {
     //     let room_list = [];
     //     // const rooms = io.of("/").adapter.rooms; // Map<Room, Set<SocketId>>
