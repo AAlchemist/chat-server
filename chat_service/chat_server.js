@@ -55,6 +55,12 @@ io.on("connection", function (socket) {
     socket.on("logout_request", function() {
         socket.username = null;
         socket.leave(socket.current_room);
+        io.to(socket.current_room).emit("change_room_response", {
+            "room": socket.current_room, 
+            "users": get_username_by_sockets(get_sockets_by_room(socket.current_room)), 
+            "host": room_creator.get(socket.current_room)
+        });
+        socket.current_room = null;
         socket.emit("logout_response");
     })
 
@@ -233,6 +239,57 @@ io.on("connection", function (socket) {
             }
         }
     });
+
+    socket.on("delete_room_request", function(room) {
+        console.log(room_creator + " " + room);
+        if (room_creator != null) {
+            let host = room_creator.get(room);
+            room_creator.delete(room);
+            // console.log(room_creator);
+            io.emit("create_room_response", Array.from(room_creator));
+            let socket_list = get_sockets_by_room(room);
+            console.log(socket_list);
+            for (socket of socket_list) {
+                socket.leave(room);
+                socket.join("global");
+                socket.current_room = "global";
+                io.to("global").emit("change_room_response", {
+                    "room": "global", 
+                    "users": get_username_by_sockets(get_sockets_by_room("global")), 
+                    "host": room_creator.get("global")
+                });
+                let msg = `Room: ${room} have been deleted by ${host}`;
+                socket.emit("message_response", {message: msg, username: socket.username});
+            }
+        }
+
+    })
+
+    socket.on("delete_room_request", function(room) {
+        console.log(room_creator + " " + room);
+        if (room_creator != null) {
+            let host = room_creator.get(room);
+            room_creator.delete(room);
+            // console.log(room_creator);
+            io.emit("create_room_response", Array.from(room_creator));
+            let socket_list = get_sockets_by_room(room);
+            console.log(socket_list);
+            for (socket of socket_list) {
+                socket.leave(room);
+                socket.join("global");
+                socket.current_room = "global";
+                io.to("global").emit("change_room_response", {
+                    "room": "global", 
+                    "users": get_username_by_sockets(get_sockets_by_room("global")), 
+                    "host": room_creator.get("global")
+                });
+                let msg = `Room: ${room} have been deleted by ${host}`;
+                socket.emit("message_response", {message: msg, username: socket.username});
+            }
+        }
+
+    })
+
     // function get_rooms() {
     //     let room_list = [];
     //     // const rooms = io.of("/").adapter.rooms; // Map<Room, Set<SocketId>>

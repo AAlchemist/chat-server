@@ -39,7 +39,7 @@
 
         </div>
         <div class= "chat_window" id="chat_window">
-            <ul id="messages"></ul>
+            <ul id="messages" style="height: 80%; overflow:auto"></ul>
             <form id="send_form">
                 <input id="input" autocomplete="off" onfocusin="Focus_In (event)" onfocusout="Focus_Out (event)"/><button id="send_btn" disabled>Send</button>
                 <select id = 'dm_list'>
@@ -75,7 +75,7 @@
     let create_room_btn = document.getElementById("create_room_btn");
     let no_room = document.getElementById("no_room");
     let global_btn = document.getElementById("global_btn");
-    let right_bar = document.getElementById("right_bar");
+    let right_bar = document.getElementById("right_bar");   
     let clicked_room = null; // for dm function use
     let curr_username = null;
     let protected_rooms = null;
@@ -134,7 +134,7 @@
         }
         item.innerHTML = `<span class="msg_name">${data["username"]}</span> <br> ${data["message"]}`;
         messages.appendChild(item);
-        window.scrollTo(0, document.body.scrollHeight);
+        messages.scrollTop = messages.scrollHeight;
     });
 
     submit_pwd.addEventListener("click", (e)=>{
@@ -208,8 +208,20 @@
                 creator_span.innerText = "Host: " + room_creator.get(room);
                 creator_span.classList.add("creator");
                 room_div.appendChild(creator_span);
+                let enter_room_btn = document.createElement("button");
+                enter_room_btn.innerHTML = "Join";
+                room_div.appendChild(enter_room_btn);
+                // Delete their own rooms
+                if (room_creator.get(room) == curr_username) {
+                    let rm_room_btn = document.createElement("button");
+                    rm_room_btn.innerHTML = "Delete";
+                    rm_room_btn.addEventListener("click", function() {
+                        socket.emit("delete_room_request", room);
+                    }, false);
+                    room_div.appendChild(rm_room_btn);
+                }
                 room_list.appendChild(room_div);
-                room_div.addEventListener("click", function(event) {
+                enter_room_btn.addEventListener("click", function(event) {
                     messages.innerHTML = "";
                     input.value = "";
                     // Change room
