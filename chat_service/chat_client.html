@@ -41,7 +41,10 @@
         <div class= "chat_window" id="chat_window">
             <ul id="messages" style="height: 80%; overflow:auto"></ul>
             <form id="send_form">
-                <input id="input" autocomplete="off" onfocusin="Focus_In (event)" onfocusout="Focus_Out (event)"/><button id="send_btn" disabled>Send</button>
+                <input id="input" autocomplete="off" onfocusin="Focus_In (event)" onfocusout="Focus_Out (event)"/>
+                <label for="send_img_input"><img src="/icon1.png" width="40px" alt="img"></label>
+                <input type="file" id="send_img_input" style="display: none;" disabled>
+                <button id="send_btn" disabled>Send</button>
                 <select id = 'dm_list'>
                     <option value = 'public'>Public</option>
                 </select>
@@ -69,6 +72,8 @@
     let logout_btn = document.getElementById('logout_btn');
     let room_list = document.getElementById("room_list");
     let dm_list = document.getElementById("dm_list");
+    // let send_img_btn = document.getElementById("send_img_btn");
+    let send_img_input = document.getElementById("send_img_input");
     let room_info = document.getElementById("room_info");
     let new_room_name = document.getElementById("new_room_name");
     let room_pwd = document.getElementById("room_pwd");
@@ -114,6 +119,35 @@
             
         }
     });
+
+    // Send Image
+    send_img_input.addEventListener("change", function() {
+        let file = this.files[0];
+        if (file == null) {
+            alert("Send Img Error!");
+            return;
+        }
+        if (file.size > 1024 * 1024) {
+            alert("The image size should < 1MB ");
+            return;
+        }
+        let reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = function() {
+            // console.log(reader.result);
+            socket.emit("send_img_request", {"img": reader.result, "room": current_room});
+        }
+    });
+    socket.on("send_img_response", function(data) {
+        let item = document.createElement('li');
+        item.classList.add("msg_li");
+        console.log(data["img"]);
+        item.innerHTML = `<span class="msg_name">${data["username"]}</span> <br> 
+        <img src="${data["img"]}" width=300px alt="loading...">`;
+        messages.appendChild(item);
+        messages.scrollTop = messages.scrollHeight;
+    })
+
     //user typing
     function Focus_In (event) { 
         socket.emit("start_typing", {'to': dm_list.value}); 
@@ -156,6 +190,8 @@
     socket.on("login_response", function(data) {
         login_status = true;
         send_btn.disabled = false;
+        // send_img_btn.disabled = false;
+        send_img_input.disabled = false;
         let username = data["username"];
         curr_username = data["username"];
         login.hidden = true;
@@ -174,6 +210,7 @@
         login_status = false;
         login.hidden = false;
         send_btn.disabled = true;
+        send_img_input.disabled = true;
         user_info.hidden = true;
         room_info.hidden = true;
         right_bar.hidden = true;
@@ -318,7 +355,9 @@
             current_room = "global";
             socket.emit("change_room_request", "global");
         }
-    }, false)
+    }, false);
+
+    
 </script>
 
 </html>

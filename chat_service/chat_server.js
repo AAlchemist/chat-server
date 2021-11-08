@@ -6,11 +6,13 @@ const port = 3456;
 const file = "chat_client.html";
 const server = http.createServer(app);
 const {Server, Socket} = require("socket.io");
+const { join } = require("path");
 const io = new Server(server);
 app.get('/', (req, res) => {
     res.sendFile(__dirname + "/" + file);
 });
 app.use(express.static("css")); // Serve css file in express
+app.use(express.static("static"));
 server.listen(port, () => console.log(`server is running! Port = ${port}`));
 
 let room_creator = new Map(); // {room_name: creater_username}
@@ -31,6 +33,12 @@ io.on("connection", function (socket) {
             // Send the message_reponse to all sockets in the room
             io.to(data["room"]).emit("message_response", { message: data["message"] , username: socket.username});
     });
+
+    socket.on("send_img_request", function(data) {
+        let room = data["room"];
+        let img = data["img"];
+        io.to(room).emit("send_img_response", {"img": img, "username": socket.username});
+    })
 
     socket.on("login_request", function(username) {
         let username_set = get_username_set();
