@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="utf-8">
@@ -34,15 +34,15 @@
                 <div id="room_list" style="width: 100%;"><span id="no_room">No Room</span></div>
             </div>
             <span id = "pwd_req"></span><br>
-            <input type = "password" id = "enter_pwd" hidden></input><br>
-            <button type="button" id="submit_pwd"hidden>Submit</button>
+            <input type = "password" id = "enter_pwd" hidden/><br>
+            <button type="button" id="submit_pwd" hidden>Submit</button>
 
         </div>
         <div class= "chat_window" id="chat_window">
             <ul id="messages" style="height: 80%; overflow:auto"></ul>
             <form id="send_form">
                 <input id="input" autocomplete="off" onfocusin="Focus_In (event)" onfocusout="Focus_Out (event)"/>
-                <label for="send_img_input"><img src="/icon1.png" width="40px" alt="img"></label>
+                <label for="send_img_input"><img src="/icon1.png" width="40" alt="img"></label>
                 <input type="file" id="send_img_input" style="display: none;" disabled>
                 <button id="send_btn" disabled>Send</button>
                 <select id = 'dm_list'>
@@ -56,308 +56,309 @@
         </div>
     </div>
 
+    <script>
+        // Ref: https://socket.io/get-started/chat#serving-html
+        let socket = io();
+        let send_form = document.getElementById('send_form');
+        let login = document.getElementById('login');
+        let send_btn = document.getElementById('send_btn');
+        let input = document.getElementById('input');
+        let messages = document.getElementById('messages');
+        let user_list = document.getElementById('user_list');
+        let user_info = document.getElementById('user_info');
+        let greeting = document.getElementById('greeting');
+        let logout_btn = document.getElementById('logout_btn');
+        let room_list = document.getElementById("room_list");
+        let dm_list = document.getElementById("dm_list");
+        // let send_img_btn = document.getElementById("send_img_btn");
+        let send_img_input = document.getElementById("send_img_input");
+        let room_info = document.getElementById("room_info");
+        let new_room_name = document.getElementById("new_room_name");
+        let room_pwd = document.getElementById("room_pwd");
+        let create_room_btn = document.getElementById("create_room_btn");
+        let no_room = document.getElementById("no_room");
+        let global_btn = document.getElementById("global_btn");
+        let right_bar = document.getElementById("right_bar");   
+        let clicked_room = null; // for dm function use
+        let curr_username = null;
+        let protected_rooms = null;
+        let pwd_req = document.getElementById("pwd_req");
+        let pwd_field = document.getElementById("enter_pwd");
+        let submit_pwd = document.getElementById("submit_pwd");
+        let login_status = false;
+        let current_room = "global";
+    
+        // Create a new chat room
+        create_room_btn.addEventListener('click', function() {
+            if (new_room_name.value && new_room_name.value.trim() != "")
+                socket.emit("create_room_request", {"new_room_name":new_room_name.value,
+                "room_pwd": room_pwd.value
+            });
+            new_room_name.value = "";
+            room_pwd.value = "";
+        })
+        socket.on("create_room_response", function(room_creator) {
+            if (login_status) refresh_rooms(new Map(room_creator));
+        });
+    
+        // Send message
+        send_btn.addEventListener('click', function(e) {
+            e.preventDefault();
+    
+            if (input.value) {
+                // Sends a request to all users in the specific room
+                if(dm_list.value == "public"){
+                    socket.emit('message_request', {"message": input.value, "room": current_room});
+                    input.value = '';
+                }else{
+                    socket.emit('dm', {'to': dm_list.value, 'room_name': current_room, 'msg': input.value});
+                    input.value = '';
+                }
+                
+            }
+        });
+    
+        // Send Image
+        send_img_input.addEventListener("change", function() {
+            let file = this.files[0];
+            if (file == null) {
+                alert("Send Img Error!");
+                return;
+            }
+            if (file.size > 1024 * 1024) {
+                alert("The image size should < 1MB ");
+                return;
+            }
+            let reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = function() {
+                // console.log(reader.result);
+                socket.emit("send_img_request", {"img": reader.result, "room": current_room});
+            }
+        });
+        socket.on("send_img_response", function(data) {
+            let item = document.createElement('li');
+            item.classList.add("msg_li");
+            console.log(data["img"]);
+            item.innerHTML = `<span class="msg_name">${data["username"]}</span> <br> 
+            <img src="${data["img"]}" width=300px alt="loading...">`;
+            messages.appendChild(item);
+            messages.scrollTop = messages.scrollHeight;
+        })
+    
+        //user typing
+        function Focus_In (event) { 
+            socket.emit("start_typing", {'to': dm_list.value}); 
+        }  
+        function Focus_Out (event) {  
+            socket.emit("stop_typing", {'to': dm_list.value}); 
+        } 
+    
+        socket.on("message_response", function (data) {
+            //Append an HR thematic break and the escaped HTML of the new message
+            let item = document.createElement('li');
+            item.classList.add("msg_li");
+            //password reqeust from server
+            if(data["message"] == "This room requires password to enter. Please enter the password here."){
+                pwd_field.hidden=false;
+                submit_pwd.hidden = false;
+                pwd_req.textContent = "Enter the password for "+clicked_room;
+            }
+            item.innerHTML = `<span class="msg_name">${data["username"]}</span> <br> ${data["message"]}`;
+            messages.appendChild(item);
+            messages.scrollTop = messages.scrollHeight;
+        });
+    
+        submit_pwd.addEventListener("click", (e)=>{
+            socket.emit("pwd_verify_request", {"room": clicked_room, 
+            "pwd": pwd_field.value
+            });
+            pwd_field.value = "";
+            pwd_field.hidden = true;
+            submit_pwd.hidden = true;
+            pwd_req.textContent = "";
+    
+        }, false);
+        // Login
+        login_btn.addEventListener('click', function() {
+            if (username.value) 
+                socket.emit("login_request", username.value);
+            username.value = "";
+        });
+        socket.on("login_response", function(data) {
+            login_status = true;
+            send_btn.disabled = false;
+            // send_img_btn.disabled = false;
+            send_img_input.disabled = false;
+            let username = data["username"];
+            curr_username = data["username"];
+            login.hidden = true;
+            user_info.hidden = false;
+            right_bar.hidden = false;
+            greeting.innerHTML = `Welcome, <strong>${username}</strong>`;
+            // user_list.createElement("li").createElement("span").textContent = data['username'];
+            refresh_rooms(new Map(data["room_creator"]));
+        });
+    
+        // Logout
+        logout_btn.addEventListener('click', function() {
+            socket.emit("logout_request");
+        })
+        socket.on("logout_response", function() {
+            login_status = false;
+            login.hidden = false;
+            send_btn.disabled = true;
+            send_img_input.disabled = true;
+            user_info.hidden = true;
+            room_info.hidden = true;
+            right_bar.hidden = true;
+            messages.innerHTML = "";
+            input.value = "";
+        })
+        
+    
+        // Alert error message from the server
+        socket.on("error_msg", function(msg) {
+            alert(msg);
+        });
+    
+        function refresh_rooms(room_creator) {
+            // console.log(room_creator);
+            room_info.hidden = false;
+            room_list.innerHTML = "";
+            if (room_creator.size != 0) {
+                no_room.remove();
+                let rooms = room_creator.keys();
+                for (let room of rooms) {
+                    let room_div = document.createElement("div");
+                    room_div.classList.add("room_div");
+                    // Join a chat room 
+                    room_div.id = room + "_room_div";
+                    let name_span = document.createElement("span");
+                    name_span.innerText = room;
+                    name_span.classList.add("room_name");
+                    room_div.appendChild(name_span);
+                    let creator_span = document.createElement("span");
+                    // Get username by socket id
+                    creator_span.innerText = "Host: " + room_creator.get(room);
+                    creator_span.classList.add("creator");
+                    room_div.appendChild(creator_span);
+                    let enter_room_btn = document.createElement("button");
+                    enter_room_btn.innerHTML = "Join";
+                    room_div.appendChild(enter_room_btn);
+                    // Delete their own rooms
+                    if (room_creator.get(room) == curr_username) {
+                        let rm_room_btn = document.createElement("button");
+                        rm_room_btn.innerHTML = "Delete";
+                        rm_room_btn.addEventListener("click", function() {
+                            socket.emit("delete_room_request", room);
+                        }, false);
+                        room_div.appendChild(rm_room_btn);
+                    }
+                    room_list.appendChild(room_div);
+                    enter_room_btn.addEventListener("click", function(event) {
+                        messages.innerHTML = "";
+                        input.value = "";
+                        // Change room
+                        if (current_room != room) {
+                            // Active CSS
+                            // if(protected_rooms.has(room)){
+                            //     let input_pwd = document.getElementById(room+"_pwd");
+                            //     if(protected_rooms.get(room) != input_pwd.value){
+                            //         socket.emit('wrong_pwd', {"message": "Wrong Password for "+room});
+                            //         return;
+                            //     }
+                            // }
+                            if (current_room != null) {
+                                let last_room = document.getElementById(current_room + "_room_div");
+                                if (last_room != null) last_room.classList.remove("current_room");
+                            }
+                            //current_room = room;
+                            clicked_room = room;
+                            room_div.classList.add("current_room");
+                            // emit request
+                            socket.emit("change_room_request", room);
+                        }
+                    }, false);
+                }
+            }
+        }
+        socket.on("change_room_response", function(data) {
+            // Update user list
+            document.getElementById("users_span").innerHTML = `<strong>Users in ${data["room"]}</strong>`;
+            let username_list = data["users"];
+            current_room = data['room'];
+            let host = data["host"];
+            user_list.innerHTML = "";
+            dm_list.innerHTML = "";
+            let public_option = document.createElement("option");
+            public_option.value = "public";
+            public_option.text = "Public";
+            dm_list.appendChild(public_option);
+            for (let username of username_list) {
+                let user_div = document.createElement("div");
+                user_div.id = username;
+                let username_span = document.createElement("span");
+                if(username!=curr_username){let option_tag = document.createElement("option");
+                option_tag.value = username;
+                option_tag.text = username;
+                dm_list.appendChild(option_tag);}
+                username_span.innerText = username;
+                user_div.appendChild(username_span);
+                if (username == host) {
+                    let host_span = document.createElement("span");
+                    host_span.textContent = "(Host)";
+                    host_span.classList.add("creator");
+                    user_div.appendChild(host_span);
+                }
+                
+                let ban_btn = document.createElement("button");
+                ban_btn.textContent = "Ban";
+                ban_btn.addEventListener("click", (event)=>{
+                    socket.emit("ban_user", {
+                    'banner_name': curr_username, 
+                    'banned_name':username,
+                    'room_name': current_room
+                });
+                user_list.removeChild(document.getElementById(username));
+                }, false);
+    
+                //kick
+                let kick_btn = document.createElement("button");
+                kick_btn.textContent = "Kick";
+                kick_btn.addEventListener("click", (event)=>{
+                    socket.emit("kick_user", {
+                    'banner_name': curr_username, 
+                    'banned_name':username,
+                    'room_name': current_room
+                });
+                user_list.removeChild(document.getElementById(username));
+                }, false);
+    
+                if(curr_username == host && curr_username != username){
+                    user_div.appendChild(ban_btn);
+                    user_div.appendChild(kick_btn);
+                }
+                user_list.appendChild(user_div);
+            }
+                
+        });
+    
+        global_btn.addEventListener("click", function() {
+            if (current_room != "global") {
+                if (current_room != null) {
+                    let last_room = document.getElementById(current_room + "_room_div");
+                    if (last_room != null) last_room.classList.remove("current_room");
+                }
+                current_room = "global";
+                socket.emit("change_room_request", "global");
+            }
+        }, false);
+    
+        
+    </script>
 </body>
 
-<script type="text/javascript">
-    // Ref: https://socket.io/get-started/chat#serving-html
-    let socket = io();
-    let send_form = document.getElementById('send_form');
-    let login = document.getElementById('login');
-    let send_btn = document.getElementById('send_btn');
-    let input = document.getElementById('input');
-    let messages = document.getElementById('messages');
-    let user_list = document.getElementById('user_list');
-    let user_info = document.getElementById('user_info');
-    let greeting = document.getElementById('greeting');
-    let logout_btn = document.getElementById('logout_btn');
-    let room_list = document.getElementById("room_list");
-    let dm_list = document.getElementById("dm_list");
-    // let send_img_btn = document.getElementById("send_img_btn");
-    let send_img_input = document.getElementById("send_img_input");
-    let room_info = document.getElementById("room_info");
-    let new_room_name = document.getElementById("new_room_name");
-    let room_pwd = document.getElementById("room_pwd");
-    let create_room_btn = document.getElementById("create_room_btn");
-    let no_room = document.getElementById("no_room");
-    let global_btn = document.getElementById("global_btn");
-    let right_bar = document.getElementById("right_bar");   
-    let clicked_room = null; // for dm function use
-    let curr_username = null;
-    let protected_rooms = null;
-    let pwd_req = document.getElementById("pwd_req");
-    let pwd_field = document.getElementById("enter_pwd");
-    let submit_pwd = document.getElementById("submit_pwd");
-    let login_status = false;
-    let current_room = "global";
 
-    // Create a new chat room
-    create_room_btn.addEventListener('click', function() {
-        if (new_room_name.value && new_room_name.value.trim() != "")
-            socket.emit("create_room_request", {"new_room_name":new_room_name.value,
-            "room_pwd": room_pwd.value
-        });
-        new_room_name.value = "";
-        room_pwd.value = "";
-    })
-    socket.on("create_room_response", function(room_creator) {
-        if (login_status) refresh_rooms(new Map(room_creator));
-    });
-
-    // Send message
-    send_btn.addEventListener('click', function(e) {
-        e.preventDefault();
-
-        if (input.value) {
-            // Sends a request to all users in the specific room
-            if(dm_list.value == "public"){
-                socket.emit('message_request', {"message": input.value, "room": current_room});
-                input.value = '';
-            }else{
-                socket.emit('dm', {'to': dm_list.value, 'room_name': current_room, 'msg': input.value});
-                input.value = '';
-            }
-            
-        }
-    });
-
-    // Send Image
-    send_img_input.addEventListener("change", function() {
-        let file = this.files[0];
-        if (file == null) {
-            alert("Send Img Error!");
-            return;
-        }
-        if (file.size > 1024 * 1024) {
-            alert("The image size should < 1MB ");
-            return;
-        }
-        let reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = function() {
-            // console.log(reader.result);
-            socket.emit("send_img_request", {"img": reader.result, "room": current_room});
-        }
-    });
-    socket.on("send_img_response", function(data) {
-        let item = document.createElement('li');
-        item.classList.add("msg_li");
-        console.log(data["img"]);
-        item.innerHTML = `<span class="msg_name">${data["username"]}</span> <br> 
-        <img src="${data["img"]}" width=300px alt="loading...">`;
-        messages.appendChild(item);
-        messages.scrollTop = messages.scrollHeight;
-    })
-
-    //user typing
-    function Focus_In (event) { 
-        socket.emit("start_typing", {'to': dm_list.value}); 
-    }  
-    function Focus_Out (event) {  
-        socket.emit("stop_typing", {'to': dm_list.value}); 
-    } 
-
-    socket.on("message_response", function (data) {
-        //Append an HR thematic break and the escaped HTML of the new message
-        let item = document.createElement('li');
-        item.classList.add("msg_li");
-        //password reqeust from server
-        if(data["message"] == "This room requires password to enter. Please enter the password here."){
-            pwd_field.hidden=false;
-            submit_pwd.hidden = false;
-            pwd_req.textContent = "Enter the password for "+clicked_room;
-        }
-        item.innerHTML = `<span class="msg_name">${data["username"]}</span> <br> ${data["message"]}`;
-        messages.appendChild(item);
-        messages.scrollTop = messages.scrollHeight;
-    });
-
-    submit_pwd.addEventListener("click", (e)=>{
-        socket.emit("pwd_verify_request", {"room": clicked_room, 
-        "pwd": pwd_field.value
-        });
-        pwd_field.value = "";
-        pwd_field.hidden = true;
-        submit_pwd.hidden = true;
-        pwd_req.textContent = "";
-
-    }, false);
-    // Login
-    login_btn.addEventListener('click', function() {
-        if (username.value) 
-            socket.emit("login_request", username.value);
-        username.value = "";
-    });
-    socket.on("login_response", function(data) {
-        login_status = true;
-        send_btn.disabled = false;
-        // send_img_btn.disabled = false;
-        send_img_input.disabled = false;
-        let username = data["username"];
-        curr_username = data["username"];
-        login.hidden = true;
-        user_info.hidden = false;
-        right_bar.hidden = false;
-        greeting.innerHTML = `Welcome, <strong>${username}</strong>`;
-        // user_list.createElement("li").createElement("span").textContent = data['username'];
-        refresh_rooms(new Map(data["room_creator"]));
-    });
-
-    // Logout
-    logout_btn.addEventListener('click', function() {
-        socket.emit("logout_request");
-    })
-    socket.on("logout_response", function() {
-        login_status = false;
-        login.hidden = false;
-        send_btn.disabled = true;
-        send_img_input.disabled = true;
-        user_info.hidden = true;
-        room_info.hidden = true;
-        right_bar.hidden = true;
-        messages.innerHTML = "";
-        input.value = "";
-    })
-    
-
-    // Alert error message from the server
-    socket.on("error_msg", function(msg) {
-        alert(msg);
-    });
-
-    function refresh_rooms(room_creator) {
-        // console.log(room_creator);
-        room_info.hidden = false;
-        room_list.innerHTML = "";
-        if (room_creator.size != 0) {
-            no_room.remove();
-            let rooms = room_creator.keys();
-            for (let room of rooms) {
-                let room_div = document.createElement("div");
-                room_div.classList.add("room_div");
-                // Join a chat room 
-                room_div.id = room + "_room_div";
-                let name_span = document.createElement("span");
-                name_span.innerText = room;
-                name_span.classList.add("room_name");
-                room_div.appendChild(name_span);
-                let creator_span = document.createElement("span");
-                // Get username by socket id
-                creator_span.innerText = "Host: " + room_creator.get(room);
-                creator_span.classList.add("creator");
-                room_div.appendChild(creator_span);
-                let enter_room_btn = document.createElement("button");
-                enter_room_btn.innerHTML = "Join";
-                room_div.appendChild(enter_room_btn);
-                // Delete their own rooms
-                if (room_creator.get(room) == curr_username) {
-                    let rm_room_btn = document.createElement("button");
-                    rm_room_btn.innerHTML = "Delete";
-                    rm_room_btn.addEventListener("click", function() {
-                        socket.emit("delete_room_request", room);
-                    }, false);
-                    room_div.appendChild(rm_room_btn);
-                }
-                room_list.appendChild(room_div);
-                enter_room_btn.addEventListener("click", function(event) {
-                    messages.innerHTML = "";
-                    input.value = "";
-                    // Change room
-                    if (current_room != room) {
-                        // Active CSS
-                        // if(protected_rooms.has(room)){
-                        //     let input_pwd = document.getElementById(room+"_pwd");
-                        //     if(protected_rooms.get(room) != input_pwd.value){
-                        //         socket.emit('wrong_pwd', {"message": "Wrong Password for "+room});
-                        //         return;
-                        //     }
-                        // }
-                        if (current_room != null) {
-                            let last_room = document.getElementById(current_room + "_room_div");
-                            if (last_room != null) last_room.classList.remove("current_room");
-                        }
-                        //current_room = room;
-                        clicked_room = room;
-                        room_div.classList.add("current_room");
-                        // emit request
-                        socket.emit("change_room_request", room);
-                    }
-                }, false);
-            }
-        }
-    }
-    socket.on("change_room_response", function(data) {
-        // Update user list
-        document.getElementById("users_span").innerHTML = `<strong>Users in ${data["room"]}</strong>`;
-        let username_list = data["users"];
-        current_room = data['room'];
-        let host = data["host"];
-        user_list.innerHTML = "";
-        dm_list.innerHTML = "";
-        let public_option = document.createElement("option");
-        public_option.value = "public";
-        public_option.text = "Public";
-        dm_list.appendChild(public_option);
-        for (let username of username_list) {
-            let user_div = document.createElement("div");
-            user_div.id = username;
-            let username_span = document.createElement("span");
-            if(username!=curr_username){let option_tag = document.createElement("option");
-            option_tag.value = username;
-            option_tag.text = username;
-            dm_list.appendChild(option_tag);}
-            username_span.innerText = username;
-            user_div.appendChild(username_span);
-            if (username == host) {
-                let host_span = document.createElement("span");
-                host_span.textContent = "(Host)";
-                host_span.classList.add("creator");
-                user_div.appendChild(host_span);
-            }
-            
-            let ban_btn = document.createElement("button");
-            ban_btn.textContent = "Ban";
-            ban_btn.addEventListener("click", (event)=>{
-                socket.emit("ban_user", {
-                'banner_name': curr_username, 
-                'banned_name':username,
-                'room_name': current_room
-            });
-            user_list.removeChild(document.getElementById(username));
-            }, false);
-
-            //kick
-            let kick_btn = document.createElement("button");
-            kick_btn.textContent = "Kick";
-            kick_btn.addEventListener("click", (event)=>{
-                socket.emit("kick_user", {
-                'banner_name': curr_username, 
-                'banned_name':username,
-                'room_name': current_room
-            });
-            user_list.removeChild(document.getElementById(username));
-            }, false);
-
-            if(curr_username == host && curr_username != username){
-                user_div.appendChild(ban_btn);
-                user_div.appendChild(kick_btn);
-            }
-            user_list.appendChild(user_div);
-        }
-            
-    });
-
-    global_btn.addEventListener("click", function() {
-        if (current_room != "global") {
-            if (current_room != null) {
-                let last_room = document.getElementById(current_room + "_room_div");
-                if (last_room != null) last_room.classList.remove("current_room");
-            }
-            current_room = "global";
-            socket.emit("change_room_request", "global");
-        }
-    }, false);
-
-    
-</script>
 
 </html>
