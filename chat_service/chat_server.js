@@ -206,7 +206,7 @@ io.on("connection", function (socket) {
     });
     socket.on("start_typing", function(data){
         var msg = socket.username +" is typing.";
-        if(data["to"] == "Public"){
+        if(data["to"] == "public"){
             io.to(socket.current_room).emit("message_response", { message: msg , username: "Server"});
         }else{
             var sockets = io.sockets.adapter.rooms.get(socket.current_room);
@@ -220,7 +220,8 @@ io.on("connection", function (socket) {
     });
     socket.on("stop_typing", function(data){
         var msg = socket.username +" stops typing.";
-        if(data["to"] == "Public"){
+        if(data["to"] == "public"){
+            console.log(socket.current_room);
             io.to(socket.current_room).emit("message_response", { message: msg , username: "Server"});
         }else{
             var sockets = io.sockets.adapter.rooms.get(socket.current_room);
